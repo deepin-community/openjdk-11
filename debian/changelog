@@ -1,3 +1,9 @@
+openjdk-11 (11.0.13+8-1deepin1) unstable; urgency=medium
+
+  * Replace g++10 dependencies with g++11
+
+ -- Yutao Meng <mengyutao@deepin.org>  Tue, 25 Apr 2023 13:37:25 +0800
+
 openjdk-11 (11.0.13+8-1) unstable; urgency=medium
 
   * OpenJDK 11.0.13+8 build (release).
