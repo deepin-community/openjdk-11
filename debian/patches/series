@@ -1,4 +1,3 @@
-# jdk11u-dev-updates.diff
 system-pcsclite.diff
 hotspot-mips-align.diff
 icc_loading_with_symlink.diff
@@ -6,7 +5,6 @@ icedtea-override-redirect-compiz.diff
 libpcsclite-dlopen.diff
 jexec.diff
 default-jvm-cfg.diff
-workaround_expand_exec_shield_cs_limit.diff
 adlc-parser.diff
 multiple-pkcs11-library-init.diff
 s390x-thread-stack-size.diff
@@ -18,30 +16,29 @@ disable-doclint-by-default.diff
 8199220.diff
 machine-flag.diff
 zero-x32.diff
-# mips-sigset.diff
-# s390x-zEC12.diff
 hotspot-disable-exec-shield-workaround.diff
 atk-wrapper-security.diff
-# java-access-bridge-security.diff
-# jdk-pulseaudio.diff
-# alpha-float-const.diff
 dnd-files.diff
 hotspot-libpath.diff
-generated-headers.patch
-parallel-build-fix.diff
 #m68k-support.diff
 reproducible-properties-timestamp.diff
 reproducible-javadoc-timestamp.diff
 Don-t-optimize-fdlibm-fork-for-Zero-on-linux-sparc-Z.patch
 keep-gtk2-as-default.patch
-jaw-classpath.diff
-jaw-optional.diff
 riscv64.diff
-8230708.diff
 reproducible-character-data.diff
 reproducible-module-info.diff
 reproducible-copyright-headers.diff
 reproducible-build-user.diff
 reproducible-build-jmod.diff
-8222825.diff
-8262085.diff
+hotspot-test-fix-npe-on-missing-file.patch
+disable-thumb-assertion.patch
+update-assertion-for-armhf.patch
+log-generated-classes-test.patch
+update-permission-test.patch
+ldap-timeout-test-use-ip.patch
+test-use-ip-address.patch
+nss-limited-ecc-tests.patch
+loong64-autoconf-config.diff
+8307977-proposed.diff
+use_clock64_fns_armhf.patch

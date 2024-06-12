@@ -50,7 +50,9 @@
 #include "utilities/debug.hpp"
 #include "utilities/formatBuffer.hpp"
 #include "utilities/macros.hpp"
-
+#ifdef LINUX
+#include "trimCHeapDCmd.hpp"
+#endif
 
 static void loadAgentModule(TRAPS) {
   ResourceMark rm(THREAD);
@@ -108,6 +110,9 @@ void DCmdRegistrant::register_dcmds(){
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CompileQueueDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CodeListDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CodeCacheDCmd>(full_export, true, false));
+#ifdef LINUX
+  DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<TrimCLibcHeapDCmd>(full_export, true, false));
+#endif // LINUX
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<TouchedMethodsDCmd>(full_export, true, false));
   DCmdFactory::register_DCmdFactory(new DCmdFactoryImpl<CodeHeapAnalyticsDCmd>(full_export, true, false));
 
@@ -507,19 +512,34 @@ HeapDumpDCmd::HeapDumpDCmd(outputStream* output, bool heap) :
   _filename("filename","Name of the dump file", "STRING",true),
   _all("-all", "Dump all objects, including unreachable objects",
        "BOOLEAN", false, "false"),
+  _gzip("-gz", "If specified, the heap dump is written in gzipped format "
+               "using the given compression level. 1 (recommended) is the fastest, "
+               "9 the strongest compression.", "INT", false, "1"),
   _overwrite("-overwrite", "If specified, the dump file will be overwritten if it exists",
            "BOOLEAN", false, "false") {
   _dcmdparser.add_dcmd_option(&_all);
   _dcmdparser.add_dcmd_argument(&_filename);
+  _dcmdparser.add_dcmd_option(&_gzip);
   _dcmdparser.add_dcmd_option(&_overwrite);
 }
 
 void HeapDumpDCmd::execute(DCmdSource source, TRAPS) {
+  jlong level = -1; // -1 means no compression.
+
+  if (_gzip.is_set()) {
+    level = _gzip.value();
+
+    if (level < 1 || level > 9) {
+      output()->print_cr("Compression level out of range (1-9): " JLONG_FORMAT, level);
+      return;
+    }
+  }
+
   // Request a full GC before heap dump if _all is false
   // This helps reduces the amount of unreachable objects in the dump
   // and makes it easier to browse.
   HeapDumper dumper(!_all.value() /* request GC if _all is false*/);
-  dumper.dump(_filename.value(), output(), _overwrite.value());
+  dumper.dump(_filename.value(), output(), (int) level, _overwrite.value());
 }
 
 int HeapDumpDCmd::num_arguments() {
@@ -903,7 +923,8 @@ void JMXStatusDCmd::execute(DCmdSource source, TRAPS) {
   if (str != NULL) {
       char* out = java_lang_String::as_utf8_string(str);
       if (out) {
-          output()->print_cr("%s", out);
+          // Avoid using print_cr() because length maybe longer than O_BUFLEN
+          output()->print_raw_cr(out);
           return;
       }
   }

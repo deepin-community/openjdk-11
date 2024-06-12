@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -119,6 +119,11 @@ class SystemProperty : public PathString {
       return set_value(value);
     }
     return false;
+  }
+  void append_writeable_value(const char *value) {
+    if (writeable()) {
+      append_value(value);
+    }
   }
 
   // Constructor
@@ -396,8 +401,11 @@ class Arguments : AllStatic {
   static bool add_property(const char* prop, PropertyWriteable writeable=WriteableProperty,
                            PropertyInternal internal=ExternalProperty);
 
-  static bool create_property(const char* prop_name, const char* prop_value, PropertyInternal internal);
-  static bool create_numbered_property(const char* prop_base_name, const char* prop_value, unsigned int count);
+  // Used for module system related properties: converted from command-line flags.
+  // Basic properties are writeable as they operate as "last one wins" and will get overwritten.
+  // Numbered properties are never writeable, and always internal.
+  static bool create_module_property(const char* prop_name, const char* prop_value, PropertyInternal internal);
+  static bool create_numbered_module_property(const char* prop_base_name, const char* prop_value, unsigned int count);
 
   static int process_patch_mod_option(const char* patch_mod_tail, bool* patch_mod_javabase);
 
@@ -450,12 +458,6 @@ class Arguments : AllStatic {
   static ArgsRange check_memory_size(julong size, julong min_size, julong max_size);
   static ArgsRange parse_memory_size(const char* s, julong* long_arg,
                                      julong min_size, julong max_size = max_uintx);
-  // Parse a string for a unsigned integer.  Returns true if value
-  // is an unsigned integer greater than or equal to the minimum
-  // parameter passed and returns the value in uintx_arg.  Returns
-  // false otherwise, with uintx_arg undefined.
-  static bool parse_uintx(const char* value, uintx* uintx_arg,
-                          uintx min_size);
 
   // methods to build strings from individual args
   static void build_jvm_args(const char* arg);
@@ -493,6 +495,12 @@ class Arguments : AllStatic {
  public:
   // Parses the arguments, first phase
   static jint parse(const JavaVMInitArgs* args);
+  // Parse a string for a unsigned integer.  Returns true if value
+  // is an unsigned integer greater than or equal to the minimum
+  // parameter passed and returns the value in uintx_arg.  Returns
+  // false otherwise, with uintx_arg undefined.
+  static bool parse_uintx(const char* value, uintx* uintx_arg,
+                          uintx min_size);
   // Apply ergonomics
   static jint apply_ergo();
   // Adjusts the arguments after the OS have adjusted the arguments
@@ -665,4 +673,16 @@ do {                                                     \
   }                                                      \
 } while(0)
 
-#endif // SHARE_VM_RUNTIME_ARGUMENTS_HPP
+// similar to UNSUPPORTED_OPTION but sets flag to NULL
+#define UNSUPPORTED_OPTION_NULL(opt)                     \
+do {                                                     \
+  if (opt) {                                             \
+    if (FLAG_IS_CMDLINE(opt)) {                          \
+      warning("-XX flag " #opt " not supported in this VM"); \
+    }                                                    \
+    FLAG_SET_DEFAULT(opt, NULL);                         \
+  }                                                      \
+} while(0)
+
+
+#endif // SHARE_RUNTIME_ARGUMENTS_HPP

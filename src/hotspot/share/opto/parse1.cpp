@@ -524,11 +524,6 @@ Parse::Parse(JVMState* caller, ciMethod* parse_method, float expected_uses)
 #ifdef ASSERT
   if (depth() == 1) {
     assert(C->is_osr_compilation() == this->is_osr_parse(), "OSR in sync");
-    if (C->tf() != tf()) {
-      MutexLockerEx ml(Compile_lock, Mutex::_no_safepoint_check_flag);
-      assert(C->env()->system_dictionary_modification_counter_changed(),
-             "Must invalidate if TypeFuncs differ");
-    }
   } else {
     assert(!this->is_osr_parse(), "no recursive OSR");
   }
@@ -615,8 +610,6 @@ Parse::Parse(JVMState* caller, ciMethod* parse_method, float expected_uses)
   // Parse all the basic blocks.
   do_all_blocks();
 
-  C->set_default_node_notes(caller_nn);
-
   // Check for bailouts during conversion to graph
   if (failing()) {
     if (log)  log->done("parse");
@@ -626,6 +619,10 @@ Parse::Parse(JVMState* caller, ciMethod* parse_method, float expected_uses)
   // Fix up all exiting control flow.
   set_map(entry_map);
   do_exits();
+
+  // Only reset this now, to make sure that debug information emitted
+  // for exiting control flow still refers to the inlined method.
+  C->set_default_node_notes(caller_nn);
 
   if (log)  log->done("parse nodes='%d' live='%d' memory='" SIZE_FORMAT "'",
                       C->unique(), C->live_nodes(), C->node_arena()->used());
@@ -1035,20 +1032,12 @@ void Parse::do_exits() {
     const Type* ret_type = tf()->range()->field_at(TypeFunc::Parms);
     Node*       ret_phi  = _gvn.transform( _exits.argument(0) );
     if (!_exits.control()->is_top() && _gvn.type(ret_phi)->empty()) {
-      // In case of concurrent class loading, the type we set for the
-      // ret_phi in build_exits() may have been too optimistic and the
-      // ret_phi may be top now.
-      // Otherwise, we've encountered an error and have to mark the method as
-      // not compilable. Just using an assertion instead would be dangerous
-      // as this could lead to an infinite compile loop in non-debug builds.
-      {
-        MutexLockerEx ml(Compile_lock, Mutex::_no_safepoint_check_flag);
-        if (C->env()->system_dictionary_modification_counter_changed()) {
-          C->record_failure(C2Compiler::retry_class_loading_during_parsing());
-        } else {
-          C->record_method_not_compilable("Can't determine return type.");
-        }
-      }
+      // If the type we set for the ret_phi in build_exits() is too optimistic and
+      // the ret_phi is top now, there's an extremely small chance that it may be due to class
+      // loading.  It could also be due to an error, so mark this method as not compilable because
+      // otherwise this could lead to an infinite compile loop.
+      // In any case, this code path is rarely (and never in my testing) reached.
+      C->record_method_not_compilable("Can't determine return type.");
       return;
     }
     if (ret_type->isa_int()) {

@@ -133,8 +133,8 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
 // notproduct flags are settable / visible only during development and are not declared in the PRODUCT version
 
 // A flag must be declared with one of the following types:
-// bool, int, uint, intx, uintx, size_t, ccstr, double, or uint64_t.
-// The type "ccstr" is an alias for "const char*" and is used
+// bool, int, uint, intx, uintx, size_t, ccstr, ccstrlist, double, or uint64_t.
+// The type "ccstr" and "ccstrlist" are an alias for "const char*" and is used
 // only in this file, because the macrology requires single-token type names.
 
 // Note: Diagnostic options not meant for VM tuning or for product modes.
@@ -580,22 +580,22 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
           "Print malloc/free statistics")                                   \
                                                                             \
   develop(bool, ZapResourceArea, trueInDebug,                               \
-          "Zap freed resource/arena space with 0xABABABAB")                 \
+          "Zap freed resource/arena space")                                 \
                                                                             \
   notproduct(bool, ZapVMHandleArea, trueInDebug,                            \
-          "Zap freed VM handle space with 0xBCBCBCBC")                      \
+          "Zap freed VM handle space")                                      \
                                                                             \
   notproduct(bool, ZapStackSegments, trueInDebug,                           \
-          "Zap allocated/freed stack segments with 0xFADFADED")             \
+          "Zap allocated/freed stack segments")                             \
                                                                             \
   develop(bool, ZapUnusedHeapArea, trueInDebug,                             \
-          "Zap unused heap space with 0xBAADBABE")                          \
+          "Zap unused heap space")                                          \
                                                                             \
   develop(bool, CheckZapUnusedHeapArea, false,                              \
           "Check zapping of unused heap space")                             \
                                                                             \
   develop(bool, ZapFillerObjects, trueInDebug,                              \
-          "Zap filler objects with 0xDEAFBABE")                             \
+          "Zap filler objects")                                             \
                                                                             \
   develop(bool, PrintVMMessages, true,                                      \
           "Print VM messages on console")                                   \
@@ -1823,6 +1823,9 @@ define_pd_global(uint64_t,MaxRAM,                    1ULL*G);
           "Maximum size of class area in Metaspace when compressed "        \
           "class pointers are used")                                        \
           range(1*M, 3*G)                                                   \
+                                                                            \
+  diagnostic(bool, PrintMetaspaceStatisticsAtExit, false,                   \
+          "Print metaspace statistics upon VM exit.")                       \
                                                                             \
   manageable(uintx, MinHeapFreeRatio, 40,                                   \
           "The minimum percentage of heap free after GC to avoid expansion."\

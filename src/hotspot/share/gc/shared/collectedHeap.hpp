@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2022, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -28,6 +28,7 @@
 #include "gc/shared/gcCause.hpp"
 #include "gc/shared/gcWhen.hpp"
 #include "memory/allocation.hpp"
+#include "memory/heapInspection.hpp"
 #include "runtime/handles.hpp"
 #include "runtime/perfData.hpp"
 #include "runtime/safepoint.hpp"
@@ -42,6 +43,7 @@
 // class defines the functions that a heap must implement, and contains
 // infrastructure common to all heaps.
 
+class AbstractGangTask;
 class AdaptiveSizePolicy;
 class BarrierSet;
 class CollectorPolicy;
@@ -83,6 +85,12 @@ class GCHeapLog : public EventLogBase<GCMessage> {
   }
 };
 
+class ParallelObjectIterator : public CHeapObj<mtGC> {
+public:
+  virtual void object_iterate(ObjectClosure* cl, uint worker_id) = 0;
+  virtual ~ParallelObjectIterator() {}
+};
+
 //
 // CollectedHeap
 //   GenCollectedHeap
@@ -93,7 +101,7 @@ class GCHeapLog : public EventLogBase<GCMessage> {
 //   ShenandoahHeap
 //   ZCollectedHeap
 //
-class CollectedHeap : public CHeapObj<mtInternal> {
+class CollectedHeap : public CHeapObj<mtGC> {
   friend class VMStructs;
   friend class JVMCIVMStructs;
   friend class IsGCActiveMark; // Block structured external access to _is_gc_active
@@ -464,6 +472,10 @@ class CollectedHeap : public CHeapObj<mtInternal> {
   // Requires "addr" to be the start of a block, and returns "TRUE" iff
   // the block is an object.
   virtual bool block_is_obj(const HeapWord* addr) const = 0;
+
+  virtual ParallelObjectIterator* parallel_object_iterator(uint thread_num) {
+    return NULL;
+  }
 
   // Keep alive an object that was loaded with AS_NO_KEEPALIVE.
   virtual void keep_alive(oop obj) {}

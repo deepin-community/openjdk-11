@@ -143,7 +143,15 @@ final class Config {
     // how often to test for token insertion, if no token is present
     private int insertionCheckInterval = 2000;
 
-    // flag inidicating whether to omit the call to C_Initialize()
+    // short ms value to indicate how often native cleaner thread is called
+    private int resourceCleanerShortInterval = 2_000;
+    // long ms value to indicate how often native cleaner thread is called
+    private int resourceCleanerLongInterval = 60_000;
+
+    // should Token be destroyed after logout()
+    private boolean destroyTokenAfterLogout;
+
+    // flag indicating whether to omit the call to C_Initialize()
     // should be used only if we are running within a process that
     // has already called it (e.g. Plugin inside of Mozilla/NSS)
     private boolean omitInitialize = false;
@@ -277,6 +285,18 @@ final class Config {
         return explicitCancel;
     }
 
+    boolean getDestroyTokenAfterLogout() {
+        return destroyTokenAfterLogout;
+    }
+
+    int getResourceCleanerShortInterval() {
+        return resourceCleanerShortInterval;
+    }
+
+    int getResourceCleanerLongInterval() {
+        return resourceCleanerLongInterval;
+    }
+
     int getInsertionCheckInterval() {
         return insertionCheckInterval;
     }
@@ -337,7 +357,7 @@ final class Config {
         try {
             return PropertyExpander.expand(s);
         } catch (Exception e) {
-            throw new RuntimeException(e.getMessage());
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 
@@ -373,6 +393,10 @@ final class Config {
 
     private ConfigurationException excLine(String msg) {
         return new ConfigurationException(msg + ", line " + st.lineno());
+    }
+
+    private ConfigurationException excLine(String msg, Throwable e) {
+        return new ConfigurationException(msg + ", line " + st.lineno(), e);
     }
 
     private void parse() throws IOException {
@@ -411,6 +435,18 @@ final class Config {
                 if (insertionCheckInterval < 100) {
                     throw excLine(word + " must be at least 100 ms");
                 }
+            } else if (word.equals("cleaner.shortInterval")) {
+                resourceCleanerShortInterval = parseIntegerEntry(word);
+                if (resourceCleanerShortInterval < 1_000) {
+                    throw excLine(word + " must be at least 1000 ms");
+                }
+            } else if (word.equals("cleaner.longInterval")) {
+                resourceCleanerLongInterval = parseIntegerEntry(word);
+                if (resourceCleanerLongInterval < 1_000) {
+                    throw excLine(word + " must be at least 1000 ms");
+                }
+            } else if (word.equals("destroyTokenAfterLogout")) {
+                destroyTokenAfterLogout = parseBooleanEntry(word);
             } else if (word.equals("showInfo")) {
                 showInfo = parseBooleanEntry(word);
             } else if (word.equals("keyStoreCompatibilityMode")) {
@@ -767,7 +803,7 @@ final class Config {
             try {
                 return Functions.getMechanismId(mech);
             } catch (IllegalArgumentException e) {
-                throw excLine("Unknown mechanism: " + mech);
+                throw excLine("Unknown mechanism: " + mech, e);
             }
         }
     }
@@ -927,7 +963,7 @@ final class Config {
         try {
             return Functions.getObjectClassId(name);
         } catch (IllegalArgumentException e) {
-            throw excLine("Unknown object class " + name);
+            throw excLine("Unknown object class " + name, e);
         }
     }
 
@@ -939,7 +975,7 @@ final class Config {
             try {
                 return Functions.getKeyId(name);
             } catch (IllegalArgumentException e) {
-                throw excLine("Unknown key algorithm " + name);
+                throw excLine("Unknown key algorithm " + name, e);
             }
         }
     }
@@ -951,7 +987,7 @@ final class Config {
             try {
                 return Functions.getAttributeId(name);
             } catch (IllegalArgumentException e) {
-                throw excLine("Unknown attribute name " + name);
+                throw excLine("Unknown attribute name " + name, e);
             }
         }
     }
@@ -1006,5 +1042,9 @@ class ConfigurationException extends IOException {
     private static final long serialVersionUID = 254492758807673194L;
     ConfigurationException(String msg) {
         super(msg);
+    }
+
+    ConfigurationException(String msg, Throwable e) {
+        super(msg, e);
     }
 }

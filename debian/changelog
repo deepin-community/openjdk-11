@@ -1,8 +1,341 @@
-openjdk-11 (11.0.13+8-1deepin1) unstable; urgency=medium
+openjdk-11 (11.0.23+9-1) unstable; urgency=high
 
-  * Replace g++10 dependencies with g++11
+  * OpenJDK 11.0.23 release, build 9.
+    - CVE-2024-21011, 8319851: Improve exception logging.
+    - CVE-2024-21068, 8322122: Enhance generation of addresses.
+    - 8318340: Improve RSA key implementations.
+    - CVE-2024-21012, 8315708: Enhance HTTP/2 client usage.
+    - CVE-2024-21094, 8317507: Already fixed in November 2023:
+      C2 compilation fails with "Exceeded _node_regs array".
+    - CVE-2024-21085, 8322114: Improve Pack 200 handling.
 
- -- Yutao Meng <mengyutao@deepin.org>  Tue, 25 Apr 2023 13:37:25 +0800
+  [ Pushkar Kulkarni ]
+  * Use 64-bit clock_* function on archs like armhf.
+
+ -- Matthias Klose <doko@ubuntu.com>  Wed, 17 Apr 2024 15:39:11 +0200
+
+openjdk-11 (11.0.23~7ea-1) unstable; urgency=medium
+
+  * OpenJDK 11.0.23+7 build (early access).
+
+  [ Matthias Klose ]
+  * Update cups dependencies for time_t64.
+
+  [ Pushkar Kulkarni ]
+  * copyright-generator: Derive release from debian/rules.
+
+ -- Matthias Klose <doko@ubuntu.com>  Thu, 21 Mar 2024 01:56:26 +0100
+
+openjdk-11 (11.0.22+7-3) unstable; urgency=medium
+
+  * libcups2, libfontconfig1: Make it a recommends in jre-headless,
+    a dependency in jre.
+  * Make the dependencies for libfontmanager.so and libjsound.so
+    recommendations in jre-headless, and dependencies in jre.
+  * Drop build dependencies on libgtk2 | libgtk3.
+  * Disable running the tests for the time_t64 bootstrap.
+
+ -- Matthias Klose <doko@ubuntu.com>  Mon, 11 Mar 2024 16:32:39 +0100
+
+openjdk-11 (11.0.22+7-2) unstable; urgency=medium
+
+  [ Matthias Klose ]
+  * Add zero support for loong64 (Leslie Zhai). Closes: #1060821.
+  * d/changelog: Whitespace cleanup.
+  * Update build dependency on libfontconfig-dev.
+  * Apply proposed patch for JDK-8307977. Closes: #1034600.
+
+  [ Vladimir Petko ]
+  * d/t/jtreg-autopkgtest.*: Set jtreg home property correctly.
+
+ -- Matthias Klose <doko@ubuntu.com>  Fri, 26 Jan 2024 21:04:10 +0100
+
+openjdk-11 (11.0.22+7-1) unstable; urgency=high
+
+  * OpenJDK 11.0.22 release, build 7.
+    - CVEs:
+      + CVE-2024-20918
+      + CVE-2024-20919
+      + CVE-2024-20921
+      + CVE-2024-20945
+      + CVE-2024-20952
+    - Security fixes:
+      + JDK-8308204: Enhanced certificate processing.
+      + JDK-8314295: Enhance verification of verifier.
+      + JDK-8314307: Improve loop handling.
+      + JDK-8314468: Improve Compiler loops.
+      + JDK-8316976: Improve signature handling.
+      + JDK-8317547: Enhance TLS connection support.
+      + JDK-8314284: Enhance Nashorn performance (CVE-2024-20926).
+
+  [ Vladimir Petko ]
+  * Generate d/watch to cope with early access and release builds.
+  * d/rules: Trim trailing whitespaces from debian/control.
+
+  [ Pushkar Kulkarni ]
+  * Minor improvements to the copyright-generator.
+
+ -- Matthias Klose <doko@ubuntu.com>  Wed, 17 Jan 2024 16:28:29 +0100
+
+openjdk-11 (11.0.22~6ea-1) unstable; urgency=medium
+
+  * OpenJDK 11.0.22+6 build (early access).
+
+  [ Pushkar Kulkarni ]
+  * debian/copyright: Update copyrights and notices, using a generator script.
+
+  [ Vladimir Petko ]
+  * d/copyright: Fix lintian warning.
+
+  [ Matthias Klose ]
+  * d/copyright: Fix source location.
+
+ -- Matthias Klose <doko@ubuntu.com>  Tue, 26 Dec 2023 13:23:50 +0100
+
+openjdk-11 (11.0.21+9-1) unstable; urgency=high
+
+  * OpenJDK 11.0.21 release, build 9.
+    - CVE-2023-22081.
+    - Release notes:
+      https://www.oracle.com/java/technologies/javase/11-0-21-relnotes.html#R11_0_21
+
+  [ Vladimir Petko ]
+  * d/test: update problemlist.
+  * d/p: drop exclude-broken-tests.patch.
+  * d/p/reproducible-properties-timestamp.diff: use the privileged action
+    to read the system property (JDK-8272157, 914278).
+
+  [ Matthias Klose ]
+  * Build using GCC 13 on development versions.
+
+  [ Pushkar Kulkarni ]
+  * Handle limited ECC capabilities of NSS on older releases.
+
+ -- Matthias Klose <doko@ubuntu.com>  Wed, 18 Oct 2023 09:28:04 +0200
+
+openjdk-11 (11.0.21~4ea-1) unstable; urgency=medium
+
+  * OpenJDK 11.0.21 release, build 4 (early access).
+
+  [ Vladimir Petko ]
+  * d/copyright: remove liblcms from excluded files.
+  * Refresh patch for 11.0.21+2 ea.
+  * d/t/jtreg-autopkgtest.{sh,in}: JDK-8232153 - set NSS_DEFAULT_DB_TYPE
+    to let sun/security/pkcs11/Secmod/AddTrustedCert.java pass.
+
+  [ Matthias Klose ]
+  * Explicitly configure --without-jtreg with the nocheck profile
+
+ -- Matthias Klose <doko@ubuntu.com>  Thu, 24 Aug 2023 12:53:49 +0200
+
+openjdk-11 (11.0.20+8-1) unstable; urgency=high
+
+  * OpenJDK 11.0.20 release, build 8.
+    - CVE-2023-22041, CVE-2023-25193, CVE-2023-22045,
+      CVE-2023-22049, CVE-2023-22036, CVE-2023-22006.
+    - Release notes:
+      https://www.oracle.com/java/technologies/javase/11-0-20-relnotes.html#R11_0_20
+
+  * Link with --no-as-needed. Closes: #1031521.
+  * Refresh patches.
+
+ -- Matthias Klose <doko@ubuntu.com>  Wed, 19 Jul 2023 08:40:22 +0200
+
+openjdk-11 (11.0.20~7-1) unstable; urgency=medium
+
+  * OpenJDK 11.0.20+7 build (early access).
+
+  [ Vladimir Petko ]
+  * debian/copyright: convert to a machine-readable format.
+  * debian/copyright: align excludes statement with openjdk-17.
+
+  * Provide versioned java-runtime, java-runtime-headless, java-sdk
+    and java-sdk-headless virtual packages (Emmanuel Bourg).
+  * Configure --with-stdc++lib=static on ia64.
+  * Bump standards version.
+
+ -- Matthias Klose <doko@ubuntu.com>  Sat, 01 Jul 2023 09:11:49 +0200
+
+openjdk-11 (11.0.19+7-1) unstable; urgency=high
+
+  * OpenJDK 11.0.19 release, build 7.
+    - CVE-2023-21930, CVE-2023-21937, CVE-2023-21938, CVE-2023-21939,
+      CVE-2023-21954, CVE-2023-21967, CVE-2023-21968.
+    - Release notes:
+      https://mail.openjdk.org/pipermail/jdk-updates-dev/2023-April/021900.html
+    - d/p/*: refresh patches.
+
+  [ Vladimir Petko ]
+  * debian/JB-jre-headless.postinst.in: trigger ca-certificates-java after jre
+    is set up.
+  * d/p: drop obsolete patches (LP: #2011653).
+    - workaround_expand_exec_shield_cs_limit.diff: obsoleted by
+      hotspot-disable-exec-shield-workaround.diff.
+    - generated-headers.patch: include is already added by openjdk makefile.
+    - parallel-build-fix.diff: include is not necessary.
+  * d/copyright, d/watch: implement uscan repackaging (LP: #2011749).
+  * d/rules: use --with-debug-symbols=none (LP: #2003820).
+  * d/control: add jtreg6 dependencies, regenerate control.
+  * d/t/{jdk,hotspot,jaxp,langtools}: run tier1 and tier2 jtreg tests only,
+    add test options from OpenJDK makefile.
+  * d/t/*: fix test environment: add missing -nativepath (LP: #2001563).
+  * d/t/jdk: provide dbus session for the window manager (LP: #2001576).
+  * d/p/*: add patches for jtreg tests:
+    - disable-thumb-assertion.patch: fix JDK-8305481.
+    - update-assertion-for-armhf.patch: fix JDK-8305480.
+    - log-generated-classes-test.patch: workaround JDK-8166162.
+    - update-permission-test.patch: add security permissions for testng 7.
+    - ldap-timeout-test-use-ip.patch, test-use-ip-address.patch: Ubuntu-specific
+      patches to workaround missing DNS resolver on the build machines.
+    - exclude_broken_tests.patch: quarantine failing tests.
+  * d/rules: package external debug symbols (LP: #2015835).
+  * drop d/p/{jaw-classpath.diff, jaw-optional.diff}: the atk wrapper is disabled
+    and these patches cause class data sharing tests to fail (LP: #2016194).
+  * d/p/exclude-broken-tests.patch: add OpenJDK 11 failures.
+  * d/t/jtreg-autopkgtest.in: pass JTREG home to locate junit.jar, regenerate
+    d/t/jtreg-autopkgtest.sh (LP: #2016206).
+  * d/t/control.in: disable jtreg autopkgtests in line with openjdk 17,
+    regenerate control (LP: #2016438).
+  * d/rules: pack external debug symbols with build-id, do not pack duplicate
+    symbols, do not strip JVM shared libraries (LP: #2012326, LP: #2016739).
+  * d/rules: always use jtreg6.
+
+  [ Matthias Klose ]
+  * d/rules: Fix using CC/CXX for recent releases.
+
+ -- Matthias Klose <doko@ubuntu.com>  Sun, 11 Jun 2023 12:55:28 +0200
+
+openjdk-11 (11.0.18+10-1) unstable; urgency=high
+
+  * OpenJDK 11.0.18+10 build (release).
+    - CVE-2023-21835, CVE-2023-21843
+    - Release notes:
+      https://www.oracle.com/java/technologies/javase/11-0-18-relnotes.html
+
+  [ Matthias Klose ]
+  * Handle jtreg package name for backports.
+
+  [ Vladimir Petko ]
+  * debian/patches/*: Refreshed patches for the new release and dropped unused
+    patches.
+  * debian/watch: use jdk11u repository as upstream.
+  * debian/rules: add lunar to jtreg version selection.
+
+ -- Matthias Klose <doko@ubuntu.com>  Thu, 26 Jan 2023 10:46:52 +0100
+
+openjdk-11 (11.0.17+8-2) unstable; urgency=medium
+
+  * Bump build dependencies on jtreg.
+
+ -- Matthias Klose <doko@ubuntu.com>  Wed, 19 Oct 2022 16:06:55 +0200
+
+openjdk-11 (11.0.17+8-1) unstable; urgency=high
+
+  * OpenJDK 11.0.17+8 build (release).
+  * Security fixes
+    - JDK-8289366: Improve HTTP/2 client usage.
+    - JDK-8288508: Enhance ECDSA usage.
+    - JDK-8286918: Better HttpServer service.
+    - JDK-8287446: Enhance icon presentations.
+    - JDK-8286910: Improve JNDI lookups.
+    - JDK-8286511: Improve macro allocation.
+    - JDK-8286526: Improve NTLM support.
+    - JDK-8286533: Key X509 usages.
+    - JDK-8286077: Wider MultiByte conversions.
+    - JDK-8286519: Better memory handling.
+    - JDK-8285662: Better permission resolution.
+    - JDK-8282252: Improve BigInteger/Decimal validation.
+  * Build using GCC 12 in recent development distros.
+  * Don't install the security/blacklisted.certs symlink anymore.
+    Closes: #1021866.
+
+ -- Matthias Klose <doko@ubuntu.com>  Wed, 19 Oct 2022 06:48:12 +0200
+
+openjdk-11 (11.0.16+8-1) unstable; urgency=high
+
+  * OpenJDK 11.0.16+8 build (release).
+  * Security fixes
+    - JDK-8277608: Address IP Addressing.
+    - JDK-8272243: Improve DER parsing.
+    - JDK-8272249: Better properties of loaded Properties.
+    - JDK-8281859, CVE-2022-21540: Improve class compilation.
+    - JDK-8281866, CVE-2022-21541: Enhance MethodHandle invocations.
+    - JDK-8283190: Improve MIDI processing.
+    - JDK-8284370: Improve zlib usage.
+    - JDK-8285407, CVE-2022-34169: Improve Xalan supports.
+
+ -- Matthias Klose <doko@ubuntu.com>  Wed, 20 Jul 2022 10:54:16 +0200
+
+openjdk-11 (11.0.15+10-1) unstable; urgency=high
+
+  * OpenJDK 11.0.15+10 build (release).
+  * Security fixes
+    - JDK-8269938: Enhance XML processing passes redux.
+    - JDK-8270504, CVE-2022-21426: Better XPath expression handling.
+    - JDK-8272255: Completely handle MIDI files.
+    - JDK-8272261: Improve JFR recording file processing.
+    - JDK-8272594: Better record of recordings.
+    - JDK-8274221: More definite BER encodings.
+    - JDK-8275082, JDK-8278008, CVE-2022-21476: Update XML Security for Java
+      to 2.3.0.
+    - JDK-8275151, CVE-2022-21443: Improved Object Identification.
+    - JDK-8277227: Better identification of OIDs.
+    - JDK-8277672, CVE-2022-21434: Better invocation handler handling.
+    - JDK-8278356: Improve file creation.
+    - JDK-8278449: Improve keychain support.
+    - JDK-8278798: Improve supported intrinsic.
+    - JDK-8278805: Enhance BMP image loading.
+    - JDK-8278972, CVE-2022-21496: Improve URL supports.
+    - JDK-8281388: Change wrapping of EncryptedPrivateKeyInfo.
+  * Refresh patches.
+
+ -- Matthias Klose <doko@ubuntu.com>  Mon, 02 May 2022 19:42:14 +0200
+
+openjdk-11 (11.0.14.1+1-1) unstable; urgency=medium
+
+  * OpenJDK 11.0.14.1+1 build (release).
+    - Fix JDK-8218546. LP: #1966338.
+
+ -- Matthias Klose <doko@ubuntu.com>  Sun, 27 Mar 2022 11:16:07 +0200
+
+openjdk-11 (11.0.14+9-1) unstable; urgency=high
+
+  * OpenJDK 11.0.14+9 build (release).
+  * Security fixes
+    - JDK-8217375: jarsigner breaks old signature with long lines in manifest.
+    - JDK-8251329: (zipfs) Files.walkFileTree walks infinitely if zip has dir
+      named "." inside.
+    - JDK-8264934, CVE-2022-21248: Enhance cross VM serialization.
+    - JDK-8268488: More valuable DerValues.
+    - JDK-8268494: Better inlining of inlined interfaces.
+    - JDK-8268512: More content for ContentInfo.
+    - JDK-8268795: Enhance digests of Jar files.
+    - JDK-8268801: Improve PKCS attribute handling.
+    - JDK-8268813, CVE-2022-21283: Better String matching.
+    - JDK-8269151: Better construction of EncryptedPrivateKeyInfo.
+    - JDK-8269944: Better HTTP transport redux.
+    - JDK-8270386, CVE-2022-21291: Better verification of scan methods.
+    - JDK-8270392, CVE-2022-21293: Improve String constructions.
+    - JDK-8270416, CVE-2022-21294: Enhance construction of Identity maps.
+    - JDK-8270492, CVE-2022-21282: Better resolution of URIs.
+    - JDK-8270498, CVE-2022-21296: Improve SAX Parser configuration management.
+    - JDK-8270646, CVE-2022-21299: Improved scanning of XML entities.
+    - JDK-8270952, CVE-2022-21277: Improve TIFF file handling.
+    - JDK-8271962: Better TrueType font loading.
+    - JDK-8271968: Better canonical naming.
+    - JDK-8271987: Manifest improved manifest entries.
+    - JDK-8272014, CVE-2022-21305: Better array indexing.
+    - JDK-8272026, CVE-2022-21340: Verify Jar Verification.
+    - JDK-8272236, CVE-2022-21341: Improve serial forms for transport.
+    - JDK-8272272: Enhance jcmd communication.
+    - JDK-8272462: Enhance image handling.
+    - JDK-8273290: Enhance sound handling.
+    - JDK-8273756, CVE-2022-21360: Enhance BMP image support.
+    - JDK-8273838, CVE-2022-21365: Enhanced BMP processing.
+    - JDK-8274096, CVE-2022-21366: Improve decoding of image files.
+    - JDK-8279541: Improve HarfBuzz.
+
+ -- Matthias Klose <doko@debian.org>  Wed, 19 Jan 2022 11:05:38 +0100
 
 openjdk-11 (11.0.13+8-1) unstable; urgency=medium
 
@@ -200,7 +533,7 @@ openjdk-11 (11.0.9+11-1) unstable; urgency=medium
   [ Tiago Stürmer Daitx ]
   * debian/rules:
     - copy apport hook to source_$(PKGSOURCE).py, fixes apport on
-      Ubuntu where source name is openjdk-lts instead of openjdk-11. 
+      Ubuntu where source name is openjdk-lts instead of openjdk-11.
   * Refresh patches.
 
   [ Matthias Klose ]
@@ -2661,7 +2994,7 @@ openjdk-7 (7~u3-2.1.1-1) unstable; urgency=medium
     - debian/patches/gcc-4.7.diff
 
   [ James Page ]
-  * Cherry picked patch from openjdk-6 to fix handling of 
+  * Cherry picked patch from openjdk-6 to fix handling of
     ICC profiles (LP: #888123, #888129) (Closes: #676351).
 
   [ Damien Raude-Morvan ]
@@ -2746,7 +3079,7 @@ openjdk-7 (7~u3-2.1-2) unstable; urgency=low
 
   [ Matthias Klose ]
   * Use NanumMyeongjo as the preferred korean font. LP: #792471.
-  * Fix crash in java.net.NetworkInterface.getNetworkInterfaces() when 
+  * Fix crash in java.net.NetworkInterface.getNetworkInterfaces() when
     ifr_ifindex exceeds 255. LP: #925218. S7078386.
   * Use IPAfont as the preferred japanesse font. Closes: #646054.
   * Build using gcj on alpha and armel. Closes: #655750.
@@ -3642,7 +3975,7 @@ openjdk-6 (6b18-1.8-4) unstable; urgency=low
   * Fix Vcs-Bzr location. Closes: #530883.
   * Search for unversioned llvm-config tool.
   * Don't set XFILESEARCHPATH and NLSPATH on startup. LP: #586641.
-  * Fix chinese font metrics and prefer using 'WenQuanYi Micro Hei' font. 
+  * Fix chinese font metrics and prefer using 'WenQuanYi Micro Hei' font.
     LP: #472845.
   * Strip libjvm.so with --strip-debug instead of --strip-unneeded.
     LP: #574997.
@@ -3720,7 +4053,7 @@ openjdk-6 (6b18-1.8-0ubuntu1) lucid; urgency=low
     While libnss3.so gets loaded from /usr/lib, the dependent libraries
     are loaded from MOZILLA_FIVE_HOME (See #561216 for the wrong firefox
     config). LP: #561124.
-    Closes as well: LP: #551328, #554909, #560829, #549010, #553452. 
+    Closes as well: LP: #551328, #554909, #560829, #549010, #553452.
   * Always build shark with hs14.
 
  -- Matthias Klose <doko@ubuntu.com>  Wed, 14 Apr 2010 01:53:33 +0200
@@ -4625,7 +4958,7 @@ openjdk-6 (6b13~pre1-0ubuntu1) jaunty; urgency=low
   * Update IcedTea build infrastructure (20081111).
     - Fix freeze in midi app, LP: #275672.
     - Fixes in the IcedTeaPlugin: LP: #282570, LP: #282570, LP: #285729,
-      LP: #291377, LP: #37330, LP: #239533. 
+      LP: #291377, LP: #37330, LP: #239533.
     - Fix vertical text metrics with freetype scaler. LP: #289784.
   * Build-depend on ecj-gcj instead of ecj on architectures using
     gij/gcj as the bootstrap system.
@@ -4642,7 +4975,7 @@ openjdk-6 (6b12-1~exp1) experimental; urgency=low
 openjdk-6 (6b12-0ubuntu6) intrepid; urgency=low
 
   * Make the dependency on ca-certificates-java unversioned.
-  * Merge from IcedTea: 
+  * Merge from IcedTea:
     - plugin/icedtea/netscape/javascript/JSObject.java: Make
       long constructor public.
 
@@ -4658,7 +4991,7 @@ openjdk-6 (6b12-0ubuntu5) intrepid; urgency=low
   * Configure with --pkgversion=<package version> to encode the package
     version in the -version output and in vm dumps.
   * cacao: Handle VM options Xverify:all and Xverify:none.
-  
+
  -- Matthias Klose <doko@ubuntu.com>  Fri, 24 Oct 2008 13:39:29 +0200
 
 openjdk-6 (6b12-0) experimental; urgency=low
@@ -5185,7 +5518,7 @@ openjdk-6 (6b06-0ubuntu3) hardy; urgency=low
     tests taken from the Fedora package).
   * Keep a backup of the `generated' directory; some files are regenerated
     differently, increasing the size of the diff.
-  
+
  -- Matthias Klose <doko@ubuntu.com>  Thu, 06 Mar 2008 10:05:39 +0100
 
 openjdk-6 (6b06-0ubuntu2) hardy; urgency=low
@@ -5212,7 +5545,7 @@ openjdk-6 (6b05-0ubuntu1) hardy; urgency=low
 
 icedtea-java7 (7~b24-1.5+20080118-2) UNRELEASED; urgency=low
 
-  * Fix removal of alternatives. 
+  * Fix removal of alternatives.
 
  -- Matthias Klose <doko@ubuntu.com>  Sat, 26 Jan 2008 18:41:40 +0100
 
@@ -5298,7 +5631,7 @@ icedtea-java7 (7~b23-1.5~20071124-1) hardy; urgency=low
 
 icedtea-java7 (7~b22-1.5~20071018-0ubuntu3) hardy; urgency=low
 
-  * Revert the previous change, require 7~b22 versions again. 
+  * Revert the previous change, require 7~b22 versions again.
 
  -- Matthias Klose <doko@ubuntu.com>  Sat, 20 Oct 2007 14:33:26 +0000
 

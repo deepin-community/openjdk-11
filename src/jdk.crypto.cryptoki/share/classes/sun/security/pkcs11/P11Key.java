@@ -48,7 +48,6 @@ import sun.security.pkcs11.wrapper.*;
 import static sun.security.pkcs11.TemplateManager.O_GENERATE;
 import static sun.security.pkcs11.wrapper.PKCS11Constants.*;
 
-import sun.security.util.Debug;
 import sun.security.util.DerValue;
 import sun.security.util.Length;
 import sun.security.util.ECUtil;
@@ -90,6 +89,9 @@ abstract class P11Key implements Key, Length {
 
     // flags indicating whether the key is a token object, sensitive, extractable
     final boolean tokenObject, sensitive, extractable;
+
+    // flag indicating whether the current token is NSS
+    final transient boolean isNSS;
 
     private final NativeKeyHolder keyIDHolder;
 
@@ -137,12 +139,12 @@ abstract class P11Key implements Key, Length {
         this.sensitive = sensitive;
         this.extractable = extractable;
         char[] tokenLabel = this.token.tokenInfo.label;
-        boolean isNSS = (tokenLabel[0] == 'N' && tokenLabel[1] == 'S'
+        isNSS = (tokenLabel[0] == 'N' && tokenLabel[1] == 'S'
                 && tokenLabel[2] == 'S');
         boolean extractKeyInfo = (!DISABLE_NATIVE_KEYS_EXTRACTION && isNSS &&
                 extractable && !tokenObject);
-        this.keyIDHolder = new NativeKeyHolder(this, keyID, session, extractKeyInfo,
-            tokenObject);
+        this.keyIDHolder = new NativeKeyHolder(this, keyID, session,
+                extractKeyInfo, tokenObject);
     }
 
     public long getKeyID() {
@@ -163,6 +165,18 @@ abstract class P11Key implements Key, Length {
     public final byte[] getEncoded() {
         byte[] b = getEncodedInternal();
         return (b == null) ? null : b.clone();
+    }
+
+    // Called by the NativeResourceCleaner at specified intervals
+    // See NativeResourceCleaner for more information
+    static boolean drainRefQueue() {
+        boolean found = false;
+        SessionKeyRef next;
+        while ((next = (SessionKeyRef) SessionKeyRef.refQueue.poll()) != null) {
+            found = true;
+            next.dispose();
+        }
+        return found;
     }
 
     abstract byte[] getEncodedInternal();
@@ -226,7 +240,8 @@ abstract class P11Key implements Key, Length {
         } else {
             // XXX short term serialization for unextractable keys
             throw new NotSerializableException
-                ("Cannot serialize sensitive and unextractable keys");
+                    ("Cannot serialize sensitive, unextractable " + (isNSS ?
+                    ", and NSS token keys" : "keys"));
         }
         return new KeyRep(type, getAlgorithm(), format, getEncoded());
     }
@@ -449,7 +464,7 @@ abstract class P11Key implements Key, Length {
         }
         public String getFormat() {
             token.ensureValid();
-            if (sensitive || (extractable == false)) {
+            if (sensitive || !extractable || (isNSS && tokenObject)) {
                 return null;
             } else {
                 return "RAW";
@@ -885,7 +900,7 @@ abstract class P11Key implements Key, Length {
             return params;
         }
         public int hashCode() {
-            if (token.isValid() == false) {
+            if (!token.isValid()) {
                 return 0;
             }
             fetchValues();
@@ -894,7 +909,7 @@ abstract class P11Key implements Key, Length {
         public boolean equals(Object obj) {
             if (this == obj) return true;
             // equals() should never throw exceptions
-            if (token.isValid() == false) {
+            if (!token.isValid()) {
                 return false;
             }
             if (!(obj instanceof DHPrivateKey)) {
@@ -1132,7 +1147,6 @@ abstract class P11Key implements Key, Length {
         }
     }
 }
-
 final class NativeKeyHolder {
 
     private static long nativeKeyWrapperKeyID = 0;
@@ -1257,6 +1271,7 @@ final class NativeKeyHolder {
             this.ref = new SessionKeyRef(p11Key, keyID, wrapperKeyUsed,
                     keySession);
         }
+
         this.nativeKeyInfo = ((ki == null || ki.length == 0)? null : ki);
     }
 
@@ -1330,24 +1345,9 @@ final class NativeKeyHolder {
  * still use these keys during finalization such as SSLSocket.
  */
 final class SessionKeyRef extends PhantomReference<P11Key> {
-    private static ReferenceQueue<P11Key> refQueue =
-        new ReferenceQueue<P11Key>();
+    static ReferenceQueue<P11Key> refQueue = new ReferenceQueue<>();
     private static Set<SessionKeyRef> refSet =
-        Collections.synchronizedSet(new HashSet<SessionKeyRef>());
-
-    static ReferenceQueue<P11Key> referenceQueue() {
-        return refQueue;
-    }
-
-    private static void drainRefQueueBounded() {
-        while (true) {
-            SessionKeyRef next = (SessionKeyRef) refQueue.poll();
-            if (next == null) {
-                break;
-            }
-            next.dispose();
-        }
-    }
+        Collections.synchronizedSet(new HashSet<>());
 
     // handle to the native key and the session it is generated under
     private long keyID;
@@ -1358,13 +1358,13 @@ final class SessionKeyRef extends PhantomReference<P11Key> {
             Session session) {
         super(p11Key, refQueue);
         if (session == null) {
-            throw new ProviderException("key must be associated with a session");
+            throw new ProviderException
+                    ("key must be associated with a session");
         }
         registerNativeKey(keyID, session);
         this.wrapperKeyUsed = wrapperKeyUsed;
 
         refSet.add(this);
-        drainRefQueueBounded();
     }
 
     void registerNativeKey(long newKeyID, Session newSession) {

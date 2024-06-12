@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001, 2020, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2001, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -78,6 +78,7 @@
 #include "logging/log.hpp"
 #include "memory/allocation.hpp"
 #include "memory/iterator.hpp"
+#include "memory/heapInspection.hpp"
 #include "memory/metaspaceShared.hpp"
 #include "memory/resourceArea.hpp"
 #include "oops/access.inline.hpp"
@@ -151,7 +152,6 @@ void G1RegionMappingChangedListener::on_commit(uint start_idx, size_t num_region
   // take advantage of the zero_filled parameter.
   reset_from_card_cache(start_idx, num_regions);
 }
-
 
 HeapRegion* G1CollectedHeap::new_heap_region(uint hrs_index,
                                              MemRegion mr) {
@@ -1865,7 +1865,6 @@ void G1CollectedHeap::iterate_dirty_card_closure(CardTableEntryClosure* cl, uint
     n_completed_buffers++;
   }
   g1_policy()->phase_times()->record_thread_work_item(G1GCPhaseTimes::UpdateRS, worker_i, n_completed_buffers, G1GCPhaseTimes::UpdateRSProcessedBuffers);
-  dcqs.clear_n_completed_buffers();
   assert(!dcqs.completed_buffers_exist_dirty(), "Completed buffers exist!");
 }
 
@@ -2118,6 +2117,30 @@ public:
 void G1CollectedHeap::object_iterate(ObjectClosure* cl) {
   IterateObjectClosureRegionClosure blk(cl);
   heap_region_iterate(&blk);
+}
+
+class G1ParallelObjectIterator : public ParallelObjectIterator {
+private:
+  G1CollectedHeap*  _heap;
+  HeapRegionClaimer _claimer;
+
+public:
+  G1ParallelObjectIterator(uint thread_num) :
+      _heap(G1CollectedHeap::heap()),
+      _claimer(thread_num == 0 ? G1CollectedHeap::heap()->workers()->active_workers() : thread_num) {}
+
+  virtual void object_iterate(ObjectClosure* cl, uint worker_id) {
+    _heap->object_iterate_parallel(cl, worker_id, &_claimer);
+  }
+};
+
+ParallelObjectIterator* G1CollectedHeap::parallel_object_iterator(uint thread_num) {
+  return new G1ParallelObjectIterator(thread_num);
+}
+
+void G1CollectedHeap::object_iterate_parallel(ObjectClosure* cl, uint worker_id, HeapRegionClaimer* claimer) {
+  IterateObjectClosureRegionClosure blk(cl);
+  heap_region_par_iterate_from_worker_offset(&blk, claimer, worker_id);
 }
 
 void G1CollectedHeap::keep_alive(oop obj) {
@@ -3782,6 +3805,31 @@ public:
   }
 };
 
+// Special closure for enqueuing discovered fields: during enqueue the card table
+// may not be in shape to properly handle normal barrier calls (e.g. card marks
+// in regions that failed evacuation, scribbling of various values by card table
+// scan code). Additionally the regular barrier enqueues into the "global"
+// DCQS, but during GC we need these to-be-refined entries in the GC local queue
+// so that after clearing the card table, the redirty cards phase will properly
+// mark all dirty cards to be picked up by refinement.
+class G1EnqueueDiscoveredFieldClosure : public EnqueueDiscoveredFieldClosure {
+  G1CollectedHeap* _g1h;
+  G1ParScanThreadState* _pss;
+
+public:
+  G1EnqueueDiscoveredFieldClosure(G1CollectedHeap* g1h, G1ParScanThreadState* pss) : _g1h(g1h), _pss(pss) { }
+
+  virtual void enqueue(HeapWord* discovered_field_addr, oop value) {
+    assert(_g1h->is_in(discovered_field_addr), PTR_FORMAT " is not in heap ", p2i(discovered_field_addr));
+    // Store the value first, whatever it is.
+    RawAccess<>::oop_store(discovered_field_addr, value);
+    if (value == NULL) {
+      return;
+    }
+    _pss->write_ref_field_post(discovered_field_addr, value);
+  }
+};
+
 // Serial drain queue closure. Called as the 'complete_gc'
 // closure for each discovered list in some of the
 // reference processing phases.
@@ -3871,11 +3919,12 @@ public:
     // Keep alive closure.
     G1CopyingKeepAliveClosure keep_alive(_g1h, pss->closures()->raw_strong_oops(), pss);
 
+    G1EnqueueDiscoveredFieldClosure enqueue(_g1h, pss);
     // Complete GC closure
     G1ParEvacuateFollowersClosure drain_queue(_g1h, pss, _task_queues, _terminator);
 
     // Call the reference processing task's work routine.
-    _proc_task.work(worker_id, is_alive, keep_alive, drain_queue);
+    _proc_task.work(worker_id, is_alive, keep_alive, enqueue, drain_queue);
 
     // Note we cannot assert that the refs array is empty here as not all
     // of the processing tasks (specifically phase2 - pp2_work) execute
@@ -3923,6 +3972,7 @@ void G1CollectedHeap::process_discovered_references(G1ParScanThreadStateSet* per
   // Keep alive closure.
   G1CopyingKeepAliveClosure keep_alive(this, pss->closures()->raw_strong_oops(), pss);
 
+  G1EnqueueDiscoveredFieldClosure enqueue(this, pss);
   // Serial Complete GC closure
   G1STWDrainQueueClosure drain_queue(this, pss);
 
@@ -3936,6 +3986,7 @@ void G1CollectedHeap::process_discovered_references(G1ParScanThreadStateSet* per
     // Serial reference processing...
     stats = rp->process_discovered_references(&is_alive,
                                               &keep_alive,
+                                              &enqueue,
                                               &drain_queue,
                                               NULL,
                                               pt);
@@ -3950,6 +4001,7 @@ void G1CollectedHeap::process_discovered_references(G1ParScanThreadStateSet* per
     G1STWRefProcTaskExecutor par_task_executor(this, per_thread_states, workers(), _task_queues);
     stats = rp->process_discovered_references(&is_alive,
                                               &keep_alive,
+                                              &enqueue,
                                               &drain_queue,
                                               &par_task_executor,
                                               pt);
