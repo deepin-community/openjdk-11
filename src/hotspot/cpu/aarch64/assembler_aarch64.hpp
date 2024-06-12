@@ -28,6 +28,19 @@
 
 #include "asm/register.hpp"
 
+#ifdef __GNUC__
+
+// __nop needs volatile so that compiler doesn't optimize it away
+#define NOP() asm volatile ("nop");
+
+#elif defined(_MSC_VER)
+
+// Use MSVC instrinsic: https://docs.microsoft.com/en-us/cpp/intrinsics/arm64-intrinsics?view=vs-2019#I
+#define NOP() __nop();
+
+#endif
+
+
 // definitions of various symbolic names for machine registers
 
 // First intercalls between C and Java which use 8 general registers
@@ -201,7 +214,7 @@ public:
 
   static void patch(address a, int msb, int lsb, uint64_t val) {
     int nbits = msb - lsb + 1;
-    guarantee(val < (1U << nbits), "Field too big for insn");
+    guarantee(val < (1ULL << nbits), "Field too big for insn");
     assert_cond(msb >= lsb);
     unsigned mask = checked_cast<unsigned>(right_n_bits(nbits));
     val <<= lsb;
@@ -380,9 +393,15 @@ class Address {
     : _base(r), _index(noreg), _offset(0), _mode(base_plus_offset), _target(0) { }
   Address(Register r, int o)
     : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
-  Address(Register r, int64_t o)
+  Address(Register r, long o)
     : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
-  Address(Register r, uint64_t o)
+  Address(Register r, long long o)
+    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
+  Address(Register r, unsigned int o)
+    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
+  Address(Register r, unsigned long o)
+    : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
+  Address(Register r, unsigned long long o)
     : _base(r), _index(noreg), _offset(o), _mode(base_plus_offset), _target(0) { }
 #ifdef ASSERT
   Address(Register r, ByteSize disp)
@@ -417,8 +436,8 @@ class Address {
   }
 
   Register base() const {
-    guarantee((_mode == base_plus_offset | _mode == base_plus_offset_reg
-               | _mode == post | _mode == post_reg),
+    guarantee((_mode == base_plus_offset || _mode == base_plus_offset_reg
+               || _mode == post || _mode == post_reg),
               "wrong mode");
     return _base;
   }
@@ -612,7 +631,7 @@ class Assembler : public AbstractAssembler {
 
   void emit_long(jint x) {
     if ((uintptr_t)pc() == asm_bp)
-      asm volatile ("nop");
+      NOP();
     AbstractAssembler::emit_int32(x);
   }
 #else
@@ -643,6 +662,8 @@ public:
   Address post(Register base, Register idx) {
     return Address(Post(base, idx));
   }
+
+  static address locate_next_instruction(address inst);
 
   Instruction_aarch64* current;
 
@@ -1512,6 +1533,11 @@ public:
 
 #undef INSN
 
+#ifdef _WIN64
+// In MSVC, `mvn` is defined as a macro and it affects compilation
+#undef mvn
+#endif
+
   // Aliases for short forms of orn
 void mvn(Register Rd, Register Rm,
             enum shift_kind kind = LSL, unsigned shift = 0) {
@@ -2259,6 +2285,8 @@ public:
   INSN(ushl,   1, 0b010001, true);  // accepted arrangements: T8B, T16B, T4H, T8H, T2S, T4S, T2D
   INSN(umullv, 1, 0b110000, false); // accepted arrangements: T8B, T16B, T4H, T8H, T2S, T4S
   INSN(umlalv, 1, 0b100000, false); // accepted arrangements: T8B, T16B, T4H, T8H, T2S, T4S
+
+  INSN(cmhi,   1, 0b001101, true);  // accepted arrangements: T8B, T16B, T4H, T8H, T2S, T4S, T2D
 
 #undef INSN
 

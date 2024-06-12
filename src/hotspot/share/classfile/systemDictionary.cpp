@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 1997, 2019, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -97,7 +97,6 @@ ResolutionErrorTable*  SystemDictionary::_resolution_errors   = NULL;
 SymbolPropertyTable*   SystemDictionary::_invoke_method_table = NULL;
 ProtectionDomainCacheTable*   SystemDictionary::_pd_cache_table = NULL;
 
-int         SystemDictionary::_number_of_modifications = 0;
 oop         SystemDictionary::_system_loader_lock_obj     =  NULL;
 
 InstanceKlass*      SystemDictionary::_well_known_klasses[SystemDictionary::WKID_LIMIT]
@@ -1010,11 +1009,7 @@ InstanceKlass* SystemDictionary::parse_stream(Symbol* class_name,
       // Add to class hierarchy, initialize vtables, and do possible
       // deoptimizations.
       add_to_hierarchy(k, CHECK_NULL); // No exception, but can block
-
       // But, do not add to dictionary.
-
-      // compiled code dependencies need to be validated anyway
-      notice_modification();
     }
 
     // Rewrite and patch constant pool here.
@@ -1176,7 +1171,7 @@ InstanceKlass* SystemDictionary::load_shared_class(
   if (ik != NULL &&
       ik->is_shared_boot_class() && class_loader.is_null()) {
     Handle protection_domain;
-    return load_shared_class(ik, class_loader, protection_domain, THREAD);
+    return load_shared_class(ik, class_loader, protection_domain, NULL, THREAD);
   }
   return NULL;
 }
@@ -1276,7 +1271,9 @@ bool SystemDictionary::is_shared_class_visible(Symbol* class_name,
 
 InstanceKlass* SystemDictionary::load_shared_class(InstanceKlass* ik,
                                                    Handle class_loader,
-                                                   Handle protection_domain, TRAPS) {
+                                                   Handle protection_domain,
+                                                   const ClassFileStream *cfs,
+                                                   TRAPS) {
 
   if (ik != NULL) {
     Symbol* class_name = ik->name();
@@ -1323,7 +1320,7 @@ InstanceKlass* SystemDictionary::load_shared_class(InstanceKlass* ik,
     }
 
     InstanceKlass* new_ik = KlassFactory::check_shared_class_file_load_hook(
-        ik, class_name, class_loader, protection_domain, CHECK_NULL);
+        ik, class_name, class_loader, protection_domain, cfs, CHECK_NULL);
     if (new_ik != NULL) {
       // The class is changed by CFLH. Return the new class. The shared class is
       // not used.
@@ -1808,14 +1805,17 @@ void SystemDictionary::add_to_hierarchy(InstanceKlass* k, TRAPS) {
   assert(k != NULL, "just checking");
   assert_locked_or_safepoint(Compile_lock);
 
-  // Link into hierachy. Make sure the vtables are initialized before linking into
+  k->set_init_state(InstanceKlass::loaded);
+  // make sure init_state store is already done.
+  // The compiler reads the hierarchy outside of the Compile_lock.
+  // Access ordering is used to add to hierarchy.
+
+  // Link into hierachy.
   k->append_to_sibling_list();                    // add to superklass/sibling list
   k->process_interfaces(THREAD);                  // handle all "implements" declarations
-  k->set_init_state(InstanceKlass::loaded);
+
   // Now flush all code that depended on old class hierarchy.
   // Note: must be done *after* linking k into the hierarchy (was bug 12/9/97)
-  // Also, first reinitialize vtable because it may have gotten out of synch
-  // while the new class wasn't connected to the class hierarchy.
   CodeCache::flush_dependents_on(k);
 }
 
@@ -1907,7 +1907,6 @@ void SystemDictionary::remove_classes_in_error_state() {
 void SystemDictionary::initialize(TRAPS) {
   // Allocate arrays
   _placeholders        = new PlaceholderTable(_placeholder_table_size);
-  _number_of_modifications = 0;
   _loader_constraints  = new LoaderConstraintTable(_loader_constraint_size);
   _resolution_errors   = new ResolutionErrorTable(_resolution_error_size);
   _invoke_method_table = new SymbolPropertyTable(_invoke_method_size);
@@ -2196,8 +2195,6 @@ void SystemDictionary::update_dictionary(unsigned int d_hash,
     InstanceKlass* sd_check = find_class(d_hash, name, dictionary);
     if (sd_check == NULL) {
       dictionary->add_klass(d_hash, name, k);
-
-      notice_modification();
     }
   #ifdef ASSERT
     sd_check = find_class(d_hash, name, dictionary);
@@ -2293,7 +2290,7 @@ bool SystemDictionary::add_loader_constraint(Symbol* class_name,
 // Add entry to resolution error table to record the error when the first
 // attempt to resolve a reference to a class has failed.
 void SystemDictionary::add_resolution_error(const constantPoolHandle& pool, int which,
-                                            Symbol* error, Symbol* message) {
+                                            Symbol* error, const char* message) {
   unsigned int hash = resolution_errors()->compute_hash(pool, which);
   int index = resolution_errors()->hash_to_index(hash);
   {
@@ -2309,7 +2306,7 @@ void SystemDictionary::delete_resolution_error(ConstantPool* pool) {
 
 // Lookup resolution error table. Returns error if found, otherwise NULL.
 Symbol* SystemDictionary::find_resolution_error(const constantPoolHandle& pool, int which,
-                                                Symbol** message) {
+                                                const char** message) {
   unsigned int hash = resolution_errors()->compute_hash(pool, which);
   int index = resolution_errors()->hash_to_index(hash);
   {

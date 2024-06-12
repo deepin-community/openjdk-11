@@ -55,7 +55,7 @@ Symbol* fieldDescriptor::generic_signature() const {
     }
   }
   assert(false, "should never happen");
-  return NULL;
+  return vmSymbols::void_signature(); // return a default value (for code analyzers)
 }
 
 AnnotationArray* fieldDescriptor::annotations() const {
@@ -123,6 +123,8 @@ void fieldDescriptor::verify() const {
     assert(_index < field_holder()->java_fields_count(), "oob");
   }
 }
+
+#endif /* PRODUCT */
 
 void fieldDescriptor::print_on(outputStream* st) const {
   access_flags().print_on(st);
@@ -214,4 +216,3 @@ void fieldDescriptor::print_on_for(outputStream* st, oop obj) {
   }
 }
 
-#endif /* PRODUCT */

@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2003, 2019, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2023, Red Hat, Inc. and/or its affiliates.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -37,6 +38,7 @@
 #include "runtime/frame.inline.hpp"
 #include "runtime/init.hpp"
 #include "runtime/os.hpp"
+#include "runtime/safefetch.inline.hpp"
 #include "runtime/thread.inline.hpp"
 #include "runtime/threadSMR.hpp"
 #include "runtime/vmThread.hpp"
@@ -81,10 +83,13 @@ const char *env_list[] = {
   "JAVA_HOME", "JRE_HOME", "JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS", "CLASSPATH",
   "JAVA_COMPILER", "PATH", "USERNAME",
 
+  "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "FC_LANG", "FONTCONFIG_USE_MMAP",
+
   // Env variables that are defined on Solaris/Linux/BSD
   "LD_LIBRARY_PATH", "LD_PRELOAD", "SHELL", "DISPLAY",
   "HOSTTYPE", "OSTYPE", "ARCH", "MACHTYPE",
-  "LANG", "LC_ALL", "LC_CTYPE", "TZ",
+  "LANG", "LC_ALL", "LC_CTYPE", "LC_NUMERIC", "LC_TIME",
+  "TERM", "TMPDIR", "TZ",
 
   // defined on Linux
   "LD_ASSUME_KERNEL", "_JAVA_SR_SIGNUM",
@@ -95,7 +100,7 @@ const char *env_list[] = {
   "DYLD_INSERT_LIBRARIES",
 
   // defined on Windows
-  "OS", "PROCESSOR_IDENTIFIER", "_ALT_JAVA_HOME_DIR",
+  "OS", "PROCESSOR_IDENTIFIER", "_ALT_JAVA_HOME_DIR", "TMP", "TEMP",
 
   (const char *)0
 };
@@ -491,10 +496,12 @@ void VMError::report(outputStream* st, bool _verbose) {
      switch(static_cast<unsigned int>(_id)) {
        case OOM_MALLOC_ERROR:
        case OOM_MMAP_ERROR:
+       case OOM_MPROTECT_ERROR:
          if (_size) {
            st->print("# Native memory allocation ");
            st->print((_id == (int)OOM_MALLOC_ERROR) ? "(malloc) failed to allocate " :
-                                                 "(mmap) failed to map ");
+                     (_id == (int)OOM_MMAP_ERROR)   ? "(mmap) failed to map " :
+                                                      "(mprotect) failed to protect ");
            jio_snprintf(buf, sizeof(buf), SIZE_FORMAT, _size);
            st->print("%s", buf);
            st->print(" bytes");
@@ -1340,12 +1347,13 @@ void VMError::report_and_die(int id, const char* message, const char* detail_fmt
   static bool log_done = false;         // done saving error log
   static bool transmit_report_done = false; // done error reporting
 
-  if (SuppressFatalErrorMessage) {
-      os::abort(CreateCoredumpOnCrash);
-  }
   intptr_t mytid = os::current_thread_id();
   if (first_error_tid == -1 &&
       Atomic::cmpxchg(mytid, &first_error_tid, (intptr_t)-1) == -1) {
+
+    if (SuppressFatalErrorMessage) {
+      os::abort(CreateCoredumpOnCrash);
+    }
 
     // Initialize time stamps to use the same base.
     out.time_stamp().update_to(1);
@@ -1399,19 +1407,31 @@ void VMError::report_and_die(int id, const char* message, const char* detail_fmt
     // This is not the first error, see if it happened in a different thread
     // or in the same thread during error reporting.
     if (first_error_tid != mytid) {
-      char msgbuf[64];
-      jio_snprintf(msgbuf, sizeof(msgbuf),
-                   "[thread " INTX_FORMAT " also had an error]",
-                   mytid);
-      out.print_raw_cr(msgbuf);
+      if (!SuppressFatalErrorMessage) {
+        char msgbuf[64];
+        jio_snprintf(msgbuf, sizeof(msgbuf),
+                     "[thread " INTX_FORMAT " also had an error]",
+                     mytid);
+        out.print_raw_cr(msgbuf);
+      }
 
-      // error reporting is not MT-safe, block current thread
+      // Error reporting is not MT-safe, nor can we let the current thread
+      // proceed, so we block it.
       os::infinite_sleep();
 
     } else {
       if (recursive_error_count++ > 30) {
-        out.print_raw_cr("[Too many errors, abort]");
+        if (!SuppressFatalErrorMessage) {
+          out.print_raw_cr("[Too many errors, abort]");
+        }
         os::die();
+      }
+
+      if (SuppressFatalErrorMessage) {
+        // If we already hit a secondary error during abort, then calling
+        // it again is likely to hit another one. But eventually, if we
+        // don't deadlock somewhere, we will call os::die() above.
+        os::abort(CreateCoredumpOnCrash);
       }
 
       outputStream* const st = log.is_open() ? &log : &out;
@@ -1550,6 +1570,7 @@ void VMError::report_and_die(int id, const char* message, const char* detail_fmt
           int e = errno;
           out.print_raw("#\n# Can't open file to dump replay data. Error: ");
           out.print_raw_cr(os::strerror(e));
+          close(fd);
         }
       }
     }
@@ -1672,42 +1693,71 @@ void VMError::show_message_box(char *buf, int buflen) {
   } while (yes);
 }
 
-// Timeout handling: check if a timeout happened (either a single step did
-// timeout or the whole of error reporting hit ErrorLogTimeout). Interrupt
-// the reporting thread if that is the case.
+// Fatal error handling is subject to several timeouts:
+// - a global timeout (controlled via ErrorLogTimeout)
+// - local error reporting step timeouts.
+//
+// The latter aims to "give the JVM a kick" if it gets stuck in one particular place during
+// error reporting. This prevents one error reporting step from hogging all the time allotted
+// to error reporting under ErrorLogTimeout.
+//
+// VMError::check_timeout() is called from the watcher thread and checks for either global
+// or step timeout. If a timeout happened, we interrupt the reporting thread and set either
+// _reporting_did_timeout or _step_did_timeout to signal which timeout fired. Function returns
+// true if the *global* timeout fired, which will cause WatcherThread to shut down the JVM
+// immediately.
 bool VMError::check_timeout() {
+
+  // This function is supposed to be called from watcher thread during fatal error handling only.
+  assert(VMError::is_error_reported(), "Only call during error handling");
+  assert(Thread::current()->is_Watcher_thread(), "Only call from watcher thread");
 
   if (ErrorLogTimeout == 0) {
     return false;
   }
 
-  // Do not check for timeouts if we still have a message box to show to the
-  // user or if there are OnError handlers to be run.
-  if (ShowMessageBoxOnError
-      || (OnError != NULL && OnError[0] != '\0')
-      || Arguments::abort_hook() != NULL) {
-    return false;
-  }
+  // There are three situations where we suppress the *global* error timeout:
+  // - if the JVM is embedded and the launcher has its abort hook installed.
+  //   That must be allowed to run.
+  // - if the user specified one or more OnError commands to run, and these
+  //   did not yet run. These must have finished.
+  // - if the user (typically developer) specified ShowMessageBoxOnError,
+  //   and the error box has not yet been shown
+  const bool ignore_global_timeout =
+      (ShowMessageBoxOnError
+            || (OnError != NULL && OnError[0] != '\0')
+            || Arguments::abort_hook() != NULL);
 
-  const jlong reporting_start_time_l = get_reporting_start_time();
   const jlong now = get_current_timestamp();
-  // Timestamp is stored in nanos.
-  if (reporting_start_time_l > 0) {
-    const jlong end = reporting_start_time_l + (jlong)ErrorLogTimeout * TIMESTAMP_TO_SECONDS_FACTOR;
-    if (end <= now) {
-      _reporting_did_timeout = true;
-      interrupt_reporting_thread();
-      return true; // global timeout
+
+  // Global timeout hit?
+  if (!ignore_global_timeout) {
+    const jlong reporting_start_time = get_reporting_start_time();
+    // Timestamp is stored in nanos.
+    if (reporting_start_time > 0) {
+      const jlong end = reporting_start_time + (jlong)ErrorLogTimeout * TIMESTAMP_TO_SECONDS_FACTOR;
+      if (end <= now && !_reporting_did_timeout) {
+        // We hit ErrorLogTimeout and we haven't interrupted the reporting
+        // thread yet.
+        _reporting_did_timeout = true;
+        interrupt_reporting_thread();
+        return true; // global timeout
+      }
     }
   }
 
-  const jlong step_start_time_l = get_step_start_time();
-  if (step_start_time_l > 0) {
+  // Reporting step timeout?
+  const jlong step_start_time = get_step_start_time();
+  if (step_start_time > 0) {
     // A step times out after a quarter of the total timeout. Steps are mostly fast unless they
     // hang for some reason, so this simple rule allows for three hanging step and still
     // hopefully leaves time enough for the rest of the steps to finish.
-    const jlong end = step_start_time_l + (jlong)ErrorLogTimeout * TIMESTAMP_TO_SECONDS_FACTOR / 4;
-    if (end <= now) {
+    const int max_step_timeout_secs = 5;
+    const jlong timeout_duration = MAX2((jlong)max_step_timeout_secs, (jlong)ErrorLogTimeout * TIMESTAMP_TO_SECONDS_FACTOR / 4);
+    const jlong end = step_start_time + timeout_duration;
+    if (end <= now && !_step_did_timeout) {
+      // The step timed out and we haven't interrupted the reporting
+      // thread yet.
       _step_did_timeout = true;
       interrupt_reporting_thread();
       return false; // (Not a global timeout)
@@ -1740,8 +1790,8 @@ static void crash_with_sigfpe() {
 // crash with sigsegv at non-null address.
 static void crash_with_segfault() {
 
-  char* const crash_addr = (char*) VMError::get_segfault_address();
-  *crash_addr = 'X';
+  int* crash_addr = reinterpret_cast<int*>(VMError::get_segfault_address());
+  *crash_addr = 1;
 
 } // end: crash_with_segfault
 
@@ -1782,6 +1832,12 @@ void VMError::controlled_crash(int how) {
   funcPtr = (const void(*)()) &functionDescriptor;
 #else
   funcPtr = (const void(*)()) 0xF;
+#endif
+
+#ifdef __APPLE__
+  // 12 is unreliable on this platform, may just yield us a "Trap" message on stdout
+  // Use 14 instead, which seems to work always
+  if (how == 12) { how = 14; }
 #endif
 
   // Keep this in sync with test/hotspot/jtreg/runtime/ErrorHandling/ErrorHandler.java

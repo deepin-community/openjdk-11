@@ -269,9 +269,8 @@ protected:
   // Both mirrors are on the ClassLoaderData::_handles list already so no
   // barriers are needed.
   void set_java_mirror_handle(OopHandle mirror) { _java_mirror = mirror; }
-  OopHandle java_mirror_handle() const          {
-    return _java_mirror;
-  }
+  OopHandle java_mirror_handle() const          { return _java_mirror;   }
+  void swap_java_mirror_handle(OopHandle& mirror) { _java_mirror.swap(mirror); }
 
   // modifier flags
   jint modifier_flags() const          { return _modifier_flags; }
@@ -347,19 +346,17 @@ protected:
   static ByteSize access_flags_offset()          { return in_ByteSize(offset_of(Klass, _access_flags)); }
 
   // Unpacking layout_helper:
-  enum {
-    _lh_neutral_value           = 0,  // neutral non-array non-instance value
-    _lh_instance_slow_path_bit  = 0x01,
-    _lh_log2_element_size_shift = BitsPerByte*0,
-    _lh_log2_element_size_mask  = BitsPerLong-1,
-    _lh_element_type_shift      = BitsPerByte*1,
-    _lh_element_type_mask       = right_n_bits(BitsPerByte),  // shifted mask
-    _lh_header_size_shift       = BitsPerByte*2,
-    _lh_header_size_mask        = right_n_bits(BitsPerByte),  // shifted mask
-    _lh_array_tag_bits          = 2,
-    _lh_array_tag_shift         = BitsPerInt - _lh_array_tag_bits,
-    _lh_array_tag_obj_value     = ~0x01   // 0x80000000 >> 30
-  };
+  static const int _lh_neutral_value           = 0;  // neutral non-array non-instance value
+  static const int _lh_instance_slow_path_bit  = 0x01;
+  static const int _lh_log2_element_size_shift = BitsPerByte*0;
+  static const int _lh_log2_element_size_mask  = BitsPerLong-1;
+  static const int _lh_element_type_shift      = BitsPerByte*1;
+  static const int _lh_element_type_mask       = right_n_bits(BitsPerByte);  // shifted mask
+  static const int _lh_header_size_shift       = BitsPerByte*2;
+  static const int _lh_header_size_mask        = right_n_bits(BitsPerByte);  // shifted mask
+  static const int _lh_array_tag_bits          = 2;
+  static const int _lh_array_tag_shift         = BitsPerInt - _lh_array_tag_bits;
+  static const int _lh_array_tag_obj_value     = ~0x01;   // 0x80000000 >> 30
 
   static const unsigned int _lh_array_tag_type_value = 0Xffffffff; // ~0x00,  // 0xC0000000 >> 30
 

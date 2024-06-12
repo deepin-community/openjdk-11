@@ -3005,7 +3005,7 @@ void ArchDesc::define_oper_interface(FILE *fp, OperandForm &oper, FormDict &glob
       // Provide a non-NULL return for disp_as_type() that will allow adr_type()
       // to correctly compute the access type for alias analysis.
       //
-      // See BugId 4796752, operand indOffset32X in i486.ad
+      // See BugId 4796752, operand indOffset32X in x86_32.ad
       int idx = rep_var_to_constant_index(disp, oper, globals);
       fprintf(fp,"  virtual const TypePtr *disp_as_type() const { return _c%d; }\n", idx);
     }
@@ -3040,6 +3040,9 @@ static void define_fill_new_machnode(bool used, FILE *fp_cpp) {
     fprintf(fp_cpp, "    if( i != cisc_operand() ) \n");
     fprintf(fp_cpp, "      to[i] = _opnds[i]->clone();\n");
     fprintf(fp_cpp, "  }\n");
+    fprintf(fp_cpp, "  // Do not increment node index counter, since node reuses my index\n");
+    fprintf(fp_cpp, "  Compile* C = Compile::current();\n");
+    fprintf(fp_cpp, "  C->set_unique(C->unique() - 1);\n");
     fprintf(fp_cpp, "}\n");
   }
   fprintf(fp_cpp, "\n");

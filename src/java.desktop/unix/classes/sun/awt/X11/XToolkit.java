@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2002, 2020, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -58,7 +58,6 @@ import java.awt.Point;
 import java.awt.PopupMenu;
 import java.awt.PrintJob;
 import java.awt.Rectangle;
-import java.awt.Robot;
 import java.awt.ScrollPane;
 import java.awt.Scrollbar;
 import java.awt.SystemColor;
@@ -126,6 +125,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.Vector;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.LookAndFeel;
 import javax.swing.UIDefaults;
@@ -1068,10 +1068,12 @@ public final class XToolkit extends UNIXToolkit implements Runnable {
     }
 
     @Override
-    public RobotPeer createRobot(Robot target, GraphicsDevice screen) {
-        return new XRobotPeer(screen.getDefaultConfiguration());
+    public RobotPeer createRobot(GraphicsDevice screen) throws AWTException {
+        if (screen instanceof X11GraphicsDevice) {
+            return new XRobotPeer((X11GraphicsDevice) screen);
+        }
+        return super.createRobot(screen);
     }
-
 
   /*
      * On X, support for dynamic layout on resizing is governed by the
@@ -2583,7 +2585,7 @@ public final class XToolkit extends UNIXToolkit implements Runnable {
      * @inheritDoc
      */
     @Override
-    protected boolean syncNativeQueue(final long timeout) {
+    protected boolean syncNativeQueue(long timeout) {
         if (timeout <= 0) {
             return false;
         }
@@ -2608,30 +2610,32 @@ public final class XToolkit extends UNIXToolkit implements Runnable {
 
             oops_updated = false;
             long event_number = getEventNumber();
-            // Generate OOPS ConfigureNotify event
-            XlibWrapper.XMoveWindow(getDisplay(), win.getWindow(),
-                                    win.scaleUp(++oops_position), 0);
             // Change win position each time to avoid system optimization
+            oops_position += 5;
             if (oops_position > 50) {
                 oops_position = 0;
             }
+            // Generate OOPS ConfigureNotify event
+            XlibWrapper.XMoveWindow(getDisplay(), win.getWindow(),
+                                    oops_position, 0);
 
             XSync();
 
             eventLog.finer("Generated OOPS ConfigureNotify event");
 
-            long start = System.currentTimeMillis();
+            long end = TimeUnit.NANOSECONDS.toMillis(System.nanoTime()) + timeout;
+            // This "while" is a protection from spurious wake-ups.
+            // However, we shouldn't wait for too long.
             while (!oops_updated) {
+                timeout = timeout(end);
+                if (timeout <= 0) {
+                    break;
+                }
                 try {
                     // Wait for OOPS ConfigureNotify event
                     awtLockWait(timeout);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
-                }
-                // This "while" is a protection from spurious
-                // wake-ups.  However, we shouldn't wait for too long
-                if ((System.currentTimeMillis() - start > timeout) && timeout >= 0) {
-                    throw new OperationTimedOut(Long.toString(System.currentTimeMillis() - start));
                 }
             }
             // Don't take into account OOPS ConfigureNotify event

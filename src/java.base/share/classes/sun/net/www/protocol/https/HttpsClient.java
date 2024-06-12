@@ -331,7 +331,7 @@ final class HttpsClient extends HttpClient
             ret = (HttpsClient) kac.get(url, sf);
             if (ret != null && httpuc != null &&
                 httpuc.streaming() &&
-                httpuc.getRequestMethod() == "POST") {
+                "POST".equals(httpuc.getRequestMethod())) {
                 if (!ret.available())
                     ret = null;
             }
@@ -428,6 +428,14 @@ final class HttpsClient extends HttpClient
         }
     }
 
+    @Override
+    public void closeServer() {
+        try {
+            // SSLSocket.close may block up to timeout. Make sure it's short.
+            serverSocket.setSoTimeout(1);
+        } catch (Exception e) {}
+        super.closeServer();
+    }
 
     @Override
     public boolean needsTunneling() {
@@ -741,6 +749,13 @@ final class HttpsClient extends HttpClient
             }
         }
         return principal;
+    }
+
+    /**
+     * Returns the {@code SSLSession} in use on this connection.
+     */
+    SSLSession getSSLSession() {
+        return session;
     }
 
     /**

@@ -4,9 +4,7 @@
  *
  * This code is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 only, as
- * published by the Free Software Foundation.  Oracle designates this
- * particular file as subject to the "Classpath" exception as provided
- * by Oracle in the LICENSE file that accompanied this code.
+ * published by the Free Software Foundation.
  *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -35,12 +33,12 @@ import java.util.stream.Stream;
 /*
  * @test
  * @bug 8169415
- * @library /lib/testlibrary/
+ * @library /test/lib
  * @modules java.logging
  *          java.base/sun.net.www
  *          java.base/sun.net.www.protocol.http
  *          jdk.httpserver/sun.net.httpserver
- * @build jdk.testlibrary.SimpleSSLContext HTTPTest HTTPTestServer HTTPTestClient HTTPSetAuthenticatorTest
+ * @build jdk.test.lib.net.SimpleSSLContext HTTPTest HTTPTestServer HTTPTestClient HTTPSetAuthenticatorTest
  * @summary A simple HTTP test that starts an echo server supporting the given
  *          authentication scheme, then starts a regular HTTP client to invoke it.
  *          The client first does a GET request on "/", then follows on
