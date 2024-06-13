@@ -724,7 +724,7 @@ else
   bd_check = file,
 endif
 
-ifeq (,$(filter $(distrel),squeeze wheezy jessie stretch buster bullseye bookworm lucid precise trusty xenial bionic focal jammy lunar mantic))
+ifeq (,$(filter $(distrel),squeeze wheezy jessie stretch buster bullseye bookworm lucid precise trusty xenial bionic focal jammy lunar mantic beige))
   t64_suffix = t64
 endif
 
@@ -1908,7 +1908,7 @@ endif
 	dh_compress -a $(nodemo) $(nojrez) -Xexamples -Xdemo -Xpackage-list
 	dh_fixperms -a $(nodemo) $(nojrez)
 	dh_makeshlibs -p$(p_jrehl) -p$(p_jre)
-ifneq (,$(filter $(distrel),squeeze wheezy jessie stretch buster bullseye bookworm lucid precise trusty xenial bionic focal jammy lunar mantic))
+ifneq (,$(filter $(distrel),squeeze wheezy jessie stretch buster bullseye bookworm lucid precise trusty xenial bionic focal jammy lunar mantic beige))
 	dh_shlibdeps -a $(nodemo) $(nojrez) -L $(p_jrehl) \
 		-l$(shlibdeps_ld_path) \
 		--
